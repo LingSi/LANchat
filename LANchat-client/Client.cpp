@@ -81,11 +81,10 @@ void Client::Send(void)
 
 void Client::Console(void)
 {
-	cout<<"\t\t\t\tswitch function:"<<endl;
 	cout<<"\t\t\t\t1.chat"<<endl;
 	cout<<"\t\t\t\t2.get online user"<<endl;
 	cout<<"\t\t\t\t3.logout"<<endl;
-	cout<<"\t\t\t\t4.return menu"<<endl;
+	cout<<"\t\t\t\t:.return menu(when send message to ':')"<<endl;
 	cin>>flag;
 }
 void Client::ChatSend(void)
@@ -96,27 +95,44 @@ void Client::ChatSend(void)
 	Msg_t msg;
 	msg.sndid = user.id;
 
-	cout<<"to->:";
-	char buf[6]={0};
-	while(getchar()!='\n');
-	Fgets(buf, 6, stdin);
-	msg.recvid=atoi(buf);
+	while(1)
+	{
+		cout<<"to:";
+		char buf[6]={0};
+		while((buf[0]=getchar())=='\n');
+		if(buf[0]==':')
+		{
+			flag=4;
+			return;
+		}
+		Fgets(buf+1, 5, stdin);
+		msg.recvid=atoi(buf);
 
-	cout<<"text:";
-	memset((char*)msg.text,0,MSGLEN);
-	Fgets(msg.text, MSGLEN, stdin);
-	msg.text[strlen(msg.text)-1]='\0';
+		cout<<"text:";
+		memset((char*)msg.text,0,MSGLEN);
+		Fgets(msg.text, MSGLEN, stdin);
+		msg.text[strlen(msg.text)-1]='\0';
 
-	if(msg.recvid!=0)
-		msg.type = MSG_CHAT;
-	else
-		msg.type = MSG_ALL;
+		if(msg.recvid!=0)
+			msg.type = MSG_CHAT;
+		else
+			msg.type = MSG_ALL;
 
-	Sendto(sockfd, &msg, sizeof(msg), 0,
-		(struct sockaddr *)&server_addr, sizeof(struct sockaddr));
+		Sendto(sockfd, &msg, sizeof(msg), 0,
+			(struct sockaddr *)&server_addr, sizeof(struct sockaddr));
+	}
 }
 void Client::GetOnlineUser(void)
 {
+	/*
+	 * lock the online object
+	 */
+	if(pthread_mutex_lock(&mutex)!=0)
+	{
+		cout<<"pthread_mutex_lock error!"<<endl;
+		exit(0);
+	}
+
 	cout<<"=====| Online User |======"<<endl;
 	const Client_t *p = online.head->next;
 	while(p!=NULL)
@@ -125,6 +141,15 @@ void Client::GetOnlineUser(void)
 		p = p->next;
 	}
 	cout<<"======== ======== ========"<<endl;
+
+	/*
+	 * unlock the online object
+	 */
+	if(pthread_mutex_unlock(&mutex)!=0)
+	{
+		cout<<"pthread_mutex_unlock error!"<<endl;
+		exit(0);
+	}
 }
 void Client::LogOut(void)
 {
@@ -185,9 +210,10 @@ inline void Client::RecvMsg(Msg_t *msg)
 }
 void Client::ChatRecv(const Msg_t* const msg)
 {
-	cout<<msg->sndid<<" >>>>>>>>>>>>>>>>>>>>"<<endl;
-	cout<<msg->text<<endl;
-	cout<<">>>>>>>>>>>>>>>>>>>> "<<msg->recvid<<endl;
+	cout<<"\n>>>>>>>> >>>>>>>> >>>>>>>> >>>>>>>>>"<<endl;
+	cout<<"sender : "<<msg->sndid<<endl;
+	cout<<"text : "<<msg->text<<endl;
+	cout<<"<<<<<<<< <<<<<<<< <<<<<<<< <<<<<<<<<"<<endl;
 }
 void Client::UserLogIn(const Msg_t* const msg)
 {
@@ -195,11 +221,30 @@ void Client::UserLogIn(const Msg_t* const msg)
 	{
 		Client_t *client = new Client_t;
 		memcpy((Client_t*)client,(char*)msg->text,sizeof(Client_t));
-		online.InsetClient(client);
 
-		cout<<"++++++++| LogIn |++++++++"<<endl;
+		cout<<"\n++++++++| LogIn |++++++++"<<endl;
 		cout<<" "<<client->user.id<<" -- "<<client->user.name<<endl;
 		cout<<"++++++++ +++++++ ++++++++"<<endl;
+
+		/*
+		 * lock the online object
+		 */
+		if(pthread_mutex_lock(&mutex)!=0)
+		{
+			cout<<"pthread_mutex_lock error!"<<endl;
+			exit(0);
+		}
+
+		online.InsetClient(client);
+
+		/*
+		 * unlock the online object
+		 */
+		if(pthread_mutex_unlock(&mutex)!=0)
+		{
+			cout<<"pthread_mutex_unlock error!"<<endl;
+			exit(0);
+		}
 	}
 	else
 		user.id=msg->recvid;
@@ -207,11 +252,29 @@ void Client::UserLogIn(const Msg_t* const msg)
 }
 void Client::UserLogOut(const Msg_t* const msg)
 {
-	online.DeleteClient(msg->sndid);
-
-	cout<<"--------| LogOut |--------"<<endl;
+	cout<<"\n--------| LogOut |--------"<<endl;
 	cout<<" "<<msg->sndid<<" -- "<<msg->text<<endl;
 	cout<<"-------- -------- --------"<<endl;
+
+	/*
+	 * lock the online object
+	 */
+	if(pthread_mutex_lock(&mutex)!=0)
+	{
+		cout<<"pthread_mutex_lock error!"<<endl;
+		exit(0);
+	}
+
+	online.DeleteClient(msg->sndid);
+
+	/*
+	 * unlock the online object
+	 */
+	if(pthread_mutex_unlock(&mutex)!=0)
+	{
+		cout<<"pthread_mutex_unlock error!"<<endl;
+		exit(0);
+	}
 }
 void Client::ServerQuit(void)
 {
@@ -220,6 +283,15 @@ void Client::ServerQuit(void)
 }
 void Client::OnlineUser(Msg_t* const msg)
 {
+	/*
+	 * lock the online object
+	 */
+	if(pthread_mutex_lock(&mutex)!=0)
+	{
+		cout<<"pthread_mutex_lock error!"<<endl;
+		exit(0);
+	}
+
 	char *pt = msg->text;
 	Client_t *pc = online.head;
 	while(pc!=NULL && pt<(msg->text+200))
@@ -227,8 +299,17 @@ void Client::OnlineUser(Msg_t* const msg)
 		Client_t *client = new Client_t;
 		memcpy((Client_t*)client,(char*)pt,sizeof(Client_t));
 		pc = client->next;
-		online.InsetClient(client);
 		pt += sizeof(Client_t);
+		online.InsetClient(client);
+	}
+
+	/*
+	 * unlock the online object
+	 */
+	if(pthread_mutex_unlock(&mutex)!=0)
+	{
+		cout<<"pthread_mutex_unlock error!"<<endl;
+		exit(0);
 	}
 }
 
@@ -247,6 +328,14 @@ Client::Client(char *ip,char *port,char *name)
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(atoi(port));
 	Inet_pton(AF_INET, ip, (struct sockaddr *)&server_addr.sin_addr);
+	/*
+	 * initialize the mutex
+	 */
+	if(pthread_mutex_init(&mutex,NULL)!=0)
+	{
+		printf("ipthread_mutex_init error!");
+		exit(0);
+	}
 }
 
 Client::~Client() {

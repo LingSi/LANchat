@@ -44,9 +44,12 @@ void Server::Send(void)
 				SerChat();
 				break;
 			case 2:
-				SerQuit();
+				GetOnlineUser();
 				break;
 			case 3:
+				SerQuit();
+				break;
+			case 4:
 				Console();
 				break;
 			default:
@@ -57,10 +60,10 @@ void Server::Send(void)
 
 void Server::Console(void)
 {
-	cout<<"\t\t\t\tswitch function:"<<endl;
 	cout<<"\t\t\t\t1.send"<<endl;
-	cout<<"\t\t\t\t2.quit"<<endl;
-	cout<<"\t\t\t\t3.return menu"<<endl;
+	cout<<"\t\t\t\t2.oneline user"<<endl;
+	cout<<"\t\t\t\t3.quit"<<endl;
+	cout<<"\t\t\t\t:.return menu(when send message to ':')"<<endl;
 	cin>>flag;
 }
 void Server::SerChat(void)
@@ -69,21 +72,29 @@ void Server::SerChat(void)
 	msg.sndid = 0;
 	msg.type = MSG_SYS;
 
-	cout<<"to->:";
-	char buf[6]={0};
-	while(getchar()!='\n');
-	Fgets(buf, 6, stdin);
-	msg.recvid=atoi(buf);
+	while(1)
+	{
+		cout<<"to:";
+		char buf[6]={0};
+		while((buf[0]=getchar())=='\n');
+		if(buf[0]==':')
+		{
+			flag=4;
+			return;
+		}
+		Fgets(buf, 5, stdin);
+		msg.recvid=atoi(buf);
 
-	cout<<"text:";
-	memset((char*)msg.text,0,MSGLEN);
-	Fgets(msg.text, MSGLEN, stdin);
-	msg.text[strlen(msg.text)-1]='\0';
+		cout<<"text:";
+		memset((char*)msg.text,0,MSGLEN);
+		Fgets(msg.text, MSGLEN, stdin);
+		msg.text[strlen(msg.text)-1]='\0';
 
-	if(msg.recvid!=0)
-		SendtoOne(&msg);
-	else
-		SendtoAll(&msg);
+		if(msg.recvid!=0)
+			SendtoOne(&msg);
+		else
+			SendtoAll(&msg);
+	}
 }
 void Server::SerQuit(void)
 {
@@ -97,7 +108,17 @@ void Server::SerQuit(void)
 	cout<<"server quit!"<<endl;
 	exit(0);
 }
-
+void Server::GetOnlineUser(void)
+{
+	cout<<"=====| Online User |======"<<endl;
+	const Client_t *p = online.head->next;
+	while(p!=NULL)
+	{
+		cout<<p->user.id<<" <--------> "<<p->user.name<<endl;
+		p = p->next;
+	}
+	cout<<"======== ======== ========"<<endl;
+}
 /*================================================================================
 Part 3:
 		Receive the chat message

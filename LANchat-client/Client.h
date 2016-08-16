@@ -40,6 +40,8 @@ private:
 	int sockfd;
 	struct sockaddr_in server_addr;
 	int flag;
+	pthread_mutex_t mutex;
+
 };
 
 #endif /* CLIENT_H_ */

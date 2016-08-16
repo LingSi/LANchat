@@ -26,6 +26,7 @@ private:
 	void Console(void);
 	void SerQuit(void);
 	void SerChat(void);
+	void GetOnlineUser(void);
 
 	inline void RecvMsg(Msg_t *msg);
 	void ClientChat(Msg_t *msg);
